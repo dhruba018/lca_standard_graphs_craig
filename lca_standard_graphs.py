@@ -4,8 +4,9 @@ import seaborn as sns
 import pdb
 from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
+import pdb
 
-def build_comparison_table(df1, df2, df1_name, df2_name, level_name='Scenarios', fillna=None):
+def build_comparison_table(alldfs, alldf_names, level_name='Scenarios', fillna=None):
     """ Combine two contribution analyses in a single comparative table
 
     Simple function that concatenates two dataframes, and adds an extra column
@@ -44,18 +45,18 @@ def build_comparison_table(df1, df2, df1_name, df2_name, level_name='Scenarios',
 
     """
 
-    a = df1.copy(deep=True)
-    b = df2.copy(deep=True)
+    for i, df in enumerate(alldfs):
+        # Add new column to identify the two dataframes
+        a = df.copy(deep=True)
+        a.insert(0, level_name, alldf_names[i], allow_duplicates=True)
+        alldfs[i] = a
 
-    # Add new column to identify the two dataframes
-    a.insert(0, level_name, df1_name, allow_duplicates=True)
-    b.insert(0, level_name, df2_name, allow_duplicates=True)
 
     # Concatenate
-    comp = pd.concat([a, b], sort=False)
+    comp = pd.concat(alldfs, sort=False)
     comp.sort_index(inplace=True)
 
-    # Define df{1|2}_name entries as index
+    # Define df_name entries as index
     comp.set_index(level_name, append=True, inplace=True)
 
     if fillna is not None:
@@ -65,7 +66,129 @@ def build_comparison_table(df1, df2, df1_name, df2_name, level_name='Scenarios',
 
 
 
-def plot_grouped_stackedbar_comparison(df, ix_categories, ix_entities_compared, norm='max', orient='h', palette_def=('pastel', 'deep', 'dark')):
+def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max', err_pos=None, err_neg=None, palette_def=('pastel', 'deep', 'dark'), width=0.3):
+    """ Plotting function behind `plot_grouped_stackedbar_comparison()`
+
+
+      The function uses increasingly dark color palettes to build a
+      gradient (from pastel, to muted, to dark, by default)
+      across all colors of the palette.
+
+
+
+    Parameters
+    ----------
+
+    df : Pandas DataFrame, as generated from build_comparsison_table()
+        Important: ALL columns in the dataframe must be relevant for the
+        contribution analysis, except those that are singled out as defining
+        confidence intervals. All other columns should be removed or used as
+        indexes
+
+    ix_entities_compared : string
+        The name of the index level that holds the entities being compared,
+        such as competing products, technologies, or scenarios
+
+    err_neg, err_pos: None, or string
+        The name of the column that holds the negative and positive errors
+        associated with the total sum of each row of df values
+        If None, no error bars will be drawn
+
+    palette_def: tupple of matplotlib or seaborn "categorical" palette definitions
+        These palettes should present the same colors, but with different
+        lightness levels, forming a gradient from lightest to darkest.
+
+    """
+
+    # Alternative approach (maybe simpler for just two scenarios):
+    # https://stackoverflow.com/questions/40121562/clustered-stacked-bar-in-python-pandas
+
+    # Hardcoded
+    edgecolor = 'k'
+    transparent = (0,0,0,0)
+
+    # Normalize
+    if norm is not None:
+        if norm == 'max':
+            df = _normalize_impacts(df, ix_categories, ix_entities_compared,
+                    donotsumbutnormalize=(err_neg, err_pos))
+        else:
+            df = _normalize_impacts(df, ix_categories, ix_entities_compared,
+                    ref=norm, donotsumbutnormalize=(err_neg, err_pos))
+
+    # Initializations
+    fig = plt.figure(facecolor='white')
+    ax = plt.subplot(111)
+    legend_elements = []
+
+    # All compared entities, in order of appearance
+    all_entities = df.index.get_level_values(ix_entities_compared).unique()
+    all_contributions = [i for i in df.columns if i not in [err_neg, err_pos]]
+
+    # Determine number of entities, portions, and colors
+    n_entities_compared = len(all_entities)
+    n_palettes = len(palette_def)
+
+    # Define palettes
+    palettes=[]
+    if n_entities_compared <= n_palettes:
+        for i in range(n_palettes - n_entities_compared, n_palettes):
+            palettes += [sns.color_palette(palette_def[i])]
+    else:
+        palettes = None
+
+
+    # Loop over all entities compared
+    for i, ent in enumerate(all_entities):
+
+        # Only the last loop contributes to the legend
+        if i != n_entities_compared - 1:
+            label = '_nolegend_'
+        else:
+            label = None
+
+        # Subset of contribution data for this loop
+        sub = df.xs(ent, axis=0, level=ix_entities_compared)[all_contributions]
+
+        if err_pos:
+            # Error bar data fro this loop, if applicable
+            err = df.xs(ent, axis=0, level=ix_entities_compared)[[err_neg, err_pos]].values.T
+        else:
+            err = None
+
+        # Plot horizontal bar
+        sub.plot.barh(ax=ax, stacked=True, position=i, width=width, zorder=-1,
+                color=sns.color_palette(palettes[i]), edgecolor=edgecolor, label=label)
+
+        # Plot over this bar with a transparent bar, to add the confidence interval
+        sub.sum(1).plot.barh(ax=ax, position=i, width=width, color=transparent, xerr=err, label='_nolegend_')
+
+
+        if i == n_entities_compared -1 :
+
+            # Generate the legend complement explaining about shading
+            legend_elements = _generate_legend(all_entities)
+
+            # Integrate in legend and plot legend
+            handles, labels = ax.get_legend_handles_labels()
+            handles2 = handles[-len(all_contributions):] + legend_elements
+            plt.legend(handles=handles2,
+                       bbox_to_anchor=(1, 0.5),
+                       bbox_transform=fig.transFigure,
+                       loc="center left")
+
+
+    # Remove context-dependent stuff, can be added a posteriori
+    ax.xaxis.set_label_text('')
+    ax.yaxis.set_label_text('')
+
+    # Rescale
+    ax.autoscale()
+
+    return ax, fig
+
+
+def plot_grouped_stackedbar_wlargegroups(df, ix_categories, ix_entities_compared, norm='max', orient='h', palette_def=('pastel', 'deep', 'dark')):
     """ Grouped stacked-bars for both comparison and contribution analysis
 
     Group bars, representing the total scores of different compared entities
@@ -134,11 +257,11 @@ def plot_grouped_stackedbar_comparison(df, ix_categories, ix_entities_compared, 
     if norm is not None:
         if norm == 'max':
             df = _normalize_impacts(df,
-                                    ix_category=ix_categories,
+                                    ix_categories=ix_categories,
                                     ix_ref_level=ix_entities_compared)
         else:
             df = _normalize_impacts(df,
-                                    ix_category=ix_categories,
+                                    ix_categories=ix_categories,
                                     ix_ref_level=ix_entities_compared,
                                     ref=norm)
 
@@ -158,7 +281,7 @@ def plot_grouped_stackedbar_comparison(df, ix_categories, ix_entities_compared, 
 
 
 
-def _normalize_impacts(df, ix_category, ix_ref_level, ref=None):
+def _normalize_impacts(df, ix_categories, ix_ref_level, ref=None, donotsumbutnormalize=('err_neg', 'err_pos')):
     """ Express the score of each entity as percentage of one specific entity
 
     Parameters
@@ -170,7 +293,7 @@ def _normalize_impacts(df, ix_category, ix_ref_level, ref=None):
         contributions to the total score of each category (e.g., lifecycle
         stages).
 
-    ix_category: string
+    ix_categories: string
         Name of index level containing the categories in terms of which the
         compared entities are quantified
 
@@ -184,6 +307,10 @@ def _normalize_impacts(df, ix_category, ix_ref_level, ref=None):
         If string, should be the index of the entity against which to normalize
         all others
 
+    donotsumbutnormalize: tuple
+        All columns that do not contribute to the total but should also be
+        normalized
+
     Returns
     -------
 
@@ -191,21 +318,24 @@ def _normalize_impacts(df, ix_category, ix_ref_level, ref=None):
 
     """
 
+    # Identify all non-error columns
+
+    stages = list(set(df.columns) - set(donotsumbutnormalize))
 
     if ref:
         # Normalize values for all entities in all categories, relative to one
         # selected reference entity (ref)
-        ref_imp = df.xs(ref, axis=0, level=ix_ref_level).sum(axis=1)
+        ref_imp = df.xs(ref, axis=0, level=ix_ref_level)[stages].sum(axis=1)
 
     else:
         # Normalize values for all entities based on the entity with the
         # highest row-sum for each category
-        grouped_levels = list({i for i in df.index.names} - {ix_category})
-        ref_imp = df.sum(axis=1).reset_index(grouped_levels, drop=True).groupby(ix_category).max()
+        grouped_levels = list({i for i in df.index.names} - {ix_categories})
+        ref_imp = df[stages].sum(axis=1).reset_index(grouped_levels, drop=True).groupby(ix_categories).max()
 
     
     # Reindex the resulting reference values, to allow for "broadcast" division
-    ref_imp = ref_imp.reindex(df.index, level=ix_category)
+    ref_imp = ref_imp.reindex(df.index, level=ix_categories)
 
     # Divide the dataframe row-wise, for a normalized result
     return df.divide(ref_imp, axis=0) * 100
@@ -253,15 +383,8 @@ def _calc_cumsum_tidy_df(df, var_name='stages'):
 
 
 def _plot_grouped_stackedbars_from_tidycumsum(cumsum_df, categories, stacked_portions, values,
-        entities_compared, orient='h', palette_def=('pastel', 'deep', 'dark'), ci=95): 
+        entities_compared, orient='h', palette_def=('pastel', 'muted', 'dark')): 
     """ Plotting function behind `plot_grouped_stackedbar_comparison()`
-
-    This function operates in two modes:
-    
-      Mode 1) If the number of entities compared is less than or equal to the number of
-      specified color palettes, the function uses these palettes to build a
-      moderate light gradient (from pastel, to deep, to dark, by default)
-      across all colors of the palette.
 
       Mode 2) If the number of entities is greater than the number of defined palettes,
       a single palette is used to define the 'color' arguments of seaborn
@@ -351,11 +474,6 @@ def _plot_grouped_stackedbars_from_tidycumsum(cumsum_df, categories, stacked_por
             color = None
             palette = [p[i] for p in palettes]
 
-        if i == n_entities_compared:
-            ci = ci
-        else:
-            ci = None
-
         ax = sns.barplot(data=g,
                  x=x,
                  y=y,
@@ -363,11 +481,10 @@ def _plot_grouped_stackedbars_from_tidycumsum(cumsum_df, categories, stacked_por
                  color=color,
                  palette=palette,
                  zorder=n_stacked_portions - i,
-                 edgecolor="k",
-                 ci=ci)
+                 edgecolor="k", ci=None)
 
         if i == 0:
-            legend_elements = generate_legend(g[entities_compared].unique())
+            legend_elements = _generate_legend(g[entities_compared].unique())
         try:
             legend_elements += [Patch(facecolor=palette[-1], label=j),]
         except TypeError:
@@ -390,7 +507,7 @@ def _plot_grouped_stackedbars_from_tidycumsum(cumsum_df, categories, stacked_por
     return ax, fig
 
 
-def generate_legend(entities):
+def _generate_legend(entities):
     legend_elements = []
 
 
@@ -415,7 +532,6 @@ def generate_legend(entities):
         legend_elements += [Patch(edgecolor='black', 
                                   facecolor='white', 
                                   label='dark colors: ' + entities[-1])]
-        legend_elements.reverse()
     return legend_elements
 
 
