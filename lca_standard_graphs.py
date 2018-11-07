@@ -7,7 +7,7 @@ from matplotlib.patches import Patch
 import pdb
 
 def build_comparison_table(alldfs, alldf_names, level_name='Scenarios', fillna=None):
-    """ Combine two contribution analyses in a single comparative table
+    """Combine two contribution analyses in a single comparative table
 
     Simple function that concatenates two dataframes, and adds an extra column
     to distinguish data from each dataframe
@@ -15,21 +15,22 @@ def build_comparison_table(alldfs, alldf_names, level_name='Scenarios', fillna=N
     Parameters
     ----------
 
-    df1, df2 : Pandas Dataframes of contribution analyses
-        Tables describing systems (1, 2) with a number of phenomena (row
-        indexes) and the contribution by parts of the system (columns) to these
-        phenomena.
+    alldfs : list of pandas dataframes to concatenate
+        List of tables describing systems with a number of impacts/phenomena
+        (row indexes) and the contribution by parts of the system (columns) to
+        these phenomena.
 
-        For example, the row indexes of df1 could define a certain number of
-        environmental impacts linked to the lifecycle of a technology, the
-        columns define the life-cycle stages of this technology, and the
-        intersections the contribution of these stages to the overall
-        life-cycle impacts.
+        For example, let's have `df1 = alldfs[0]`. The row indexes of df1 could
+        define a certain number of environmental impacts linked to the
+        lifecycle of a technology, whereas the columns define the life-cycle
+        stages of this technology, and the data thus quantifies the
+        contribution of these stages to the overall life-cycle impacts.
 
-    df1_name, df2_name : string
-        To distinguish between the technologies/systems/scenarios from `df1`
-        and `df2` in the comparison table. These names will be integrated as
-        new indexes, forming/expanding a multiindex
+    alldf_names : list of strings
+        To distinguish between the technologies/systems/scenarios from the
+        different dataframes in `alldfs`, these scenarios are given names n the
+        comparison table. These names will be integrated as new indexes,
+        forming/expanding a multiindex
 
     level_name : string, optional
         Name of multiindex level that holds the df1_name and df2_name indexes
@@ -45,14 +46,17 @@ def build_comparison_table(alldfs, alldf_names, level_name='Scenarios', fillna=N
 
     """
 
+    # For every dataframe to be integrated in the comparison
     for i, df in enumerate(alldfs):
-        # Add new column to identify the two dataframes
+
+        # Add new column to identify data from the two dataframes after
+        # concatenation
         a = df.copy(deep=True)
         a.insert(0, level_name, alldf_names[i], allow_duplicates=True)
         alldfs[i] = a
 
 
-    # Concatenate
+    # Concatenate all toegher
     comp = pd.concat(alldfs, sort=False)
     comp.sort_index(inplace=True)
 
@@ -65,29 +69,63 @@ def build_comparison_table(alldfs, alldf_names, level_name='Scenarios', fillna=N
     return comp
 
 
-
 def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max', err_pos=None, err_neg=None, palette_def=('pastel', 'deep', 'dark'), width=0.3):
-    """ Plotting function behind `plot_grouped_stackedbar_comparison()`
+    """ Grouped stacked-bars for both comparison and contribution analysis
 
+    This plot groups bars, representing the total scores of different entities
+    [ix_entities_compared] in terms of multiple comparison categories
+    [ix_categories], while at the same time breaking down these total scores
+    into contribution analysis.
 
-      The function uses increasingly dark color palettes to build a
-      gradient (from pastel, to muted, to dark, by default)
-      across all colors of the palette.
+    For example, compare two vehicles (ix_entities_compared) in terms of
+    climate change and resource depletion impacts (ix_categories), and break
+    down their total impacts in terms of multiple lifecycle stages, such as the
+    contribution of vehicle production, use phase and end-of-life treatment.
 
+    The function uses a color polette to distinguish between lifecycle stages,
+    and increasingly darker variants of this palette (from pastel, to muted, to
+    dark, by default) to distinguish between the technologies/scenarios
+    being compared (ix_entities_compared).
+
+    All colour palettes must be defined explicitly. For comparisons involving
+    many compared entities (>3), it may be more convenient to use
+    `plot_grouped_stackedbar_wlargegroups()`, which automatically generates the
+    shading gradient. Unfortunately, this function does not allow for the
+    definition of error margins (confidence intervals).
 
 
     Parameters
     ----------
 
-    df : Pandas DataFrame, as generated from build_comparsison_table()
+    df : pandas multi-index dataframe, as generated from build_comparsison_table()
+
+        The DataFrame must be multi-index, with one index level indicating the
+        comparison category/criteria, and another level indicating the entities
+        being compared. All columns must represent an element of the
+        contribution analysis
+
         Important: ALL columns in the dataframe must be relevant for the
         contribution analysis, except those that are singled out as defining
-        confidence intervals. All other columns should be removed or used as
-        indexes
+        confidence intervals (`err_pos`, `err_neg`). All other columns should
+        be removed or used as indexes
+
+    ix_categories : string
+        The name of the index level that holds the categories/criteria for the
+        comparison. For example, types of life cycle impacts
 
     ix_entities_compared : string
         The name of the index level that holds the entities being compared,
         such as competing products, technologies, or scenarios
+
+    norm : None or string {'max' | index of reference entity }
+        If Norm is None, the stacked bars are not being normalized
+
+        If norm == 'max' (default): Within each comparison categories, the
+        different entities are normalized relative to the entity with the
+        largest score.
+
+        If norm is the index of a specific reference entity, all other
+        entities are normalized relative to that one.
 
     err_neg, err_pos: None, or string
         The name of the column that holds the negative and positive errors
@@ -97,6 +135,9 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
     palette_def: tupple of matplotlib or seaborn "categorical" palette definitions
         These palettes should present the same colors, but with different
         lightness levels, forming a gradient from lightest to darkest.
+
+    width : float
+        The width of the bars.
 
     """
 
