@@ -6,69 +6,6 @@ from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
 import pdb
 
-def build_comparison_table(alldfs, alldf_names, level_name='Scenarios', fillna=None):
-    """Combine two contribution analyses in a single comparative table
-
-    Simple function that concatenates two dataframes, and adds an extra column
-    to distinguish data from each dataframe
-
-    Parameters
-    ----------
-
-    alldfs : list of pandas dataframes to concatenate
-        List of tables describing systems with a number of impacts/phenomena
-        (row indexes) and the contribution by parts of the system (columns) to
-        these phenomena.
-
-        For example, let's have `df1 = alldfs[0]`. The row indexes of df1 could
-        define a certain number of environmental impacts linked to the
-        lifecycle of a technology, whereas the columns define the life-cycle
-        stages of this technology, and the data thus quantifies the
-        contribution of these stages to the overall life-cycle impacts.
-
-    alldf_names : list of strings
-        To distinguish between the technologies/systems/scenarios from the
-        different dataframes in `alldfs`, these scenarios are given names n the
-        comparison table. These names will be integrated as new indexes,
-        forming/expanding a multiindex
-
-    level_name : string, optional
-        Name of multiindex level that holds the df1_name and df2_name indexes
-
-    fillna: None|float, optional
-
-
-    Returns
-    -------
-    comp : Pandas Dataframe
-        A multi-index combined DataFrame, to compare `df1` and `df2`, which are
-        distinguished as a new level of indexes
-
-    """
-
-    # For every dataframe to be integrated in the comparison
-    for i, df in enumerate(alldfs):
-
-        # Add new column to identify data from the two dataframes after
-        # concatenation
-        a = df.copy(deep=True)
-        a.insert(0, level_name, alldf_names[i], allow_duplicates=True)
-        alldfs[i] = a
-
-
-    # Concatenate all toegher
-    comp = pd.concat(alldfs, sort=False)
-    comp.sort_index(inplace=True)
-
-    # Define df_name entries as index
-    comp.set_index(level_name, append=True, inplace=True)
-
-    if fillna is not None:
-        comp.fillna(fillna, inplace=True)
-
-    return comp
-
-
 def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max', err_pos=None, err_neg=None, palette_def=('pastel', 'deep', 'dark'), width=0.3):
     """ Grouped stacked-bars for both comparison and contribution analysis
 
@@ -83,7 +20,7 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
     contribution of vehicle production, use phase and end-of-life treatment.
 
     The function uses a color polette to distinguish between lifecycle stages,
-    and increasingly darker variants of this palette (from pastel, to muted, to
+    and increasingly darker variants of this palette (from pastel, to deep, to
     dark, by default) to distinguish between the technologies/scenarios
     being compared (ix_entities_compared).
 
@@ -138,6 +75,14 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
 
     width : float
         The width of the bars.
+
+    Returns
+    -------
+    ax, fig : matplotlib axes and figure
+
+    See Also
+    --------
+    Depends on internal functions _normalize_impacts() and _generate_legend()
 
     """
 
@@ -321,6 +266,71 @@ def plot_grouped_stackedbar_wlargegroups(df, ix_categories, ix_entities_compared
     return ax, fig
 
 
+def plot_stochastic_comparison(scen1, scen2, name1, name2, palette='deep'):
+    """ Plot the probability that scenario 1 or 2 have lower impacts
+
+    Parameters
+    ----------
+    scen1, scen2 : Pandas DataFrames
+        With impacts as indexes, defining the comparison categories, and with
+        stochastic iterations as columns
+
+    name1, name2 : string
+        Names to identify the scenarios to be compared, i.e. those in scen1 and
+        scen2
+
+    palette : seaborn or matplotlib color palette to use
+
+
+    Returns
+    -------
+    ax, fig : matplotlib axes and figure
+
+    """
+
+    # Initialize and get dimensions
+    n_iter = scen1.shape[1]
+    prob_better = pd.DataFrame(index=scen1.index, columns=[name1, name2])
+
+    # Perform calculation as numpy array (50x faster)
+    scen1 = scen1.values
+    scen2 = scen2.values
+
+    # calculate probability of scen1 being better than scen2 for all impact categories
+    prob_better.loc[:, name1] = -1 * ((scen1 < scen2).sum(1) + 0.5 * (scen1 == scen2).sum(1)) / n_iter * 100
+
+    # And vice versa
+    # note: we calculate the probability of scenario2 < scenario1 independently.
+    #       this could be done more efficiently with `100% - prob_better.loc[:, name1]`, 
+    #       but it has the potential of hiding failures. For example if a whole row is zero by mistake 
+    #       (NaN issue, etc.), we want both scenarios at 0%, not accidently ascribe 100% to scenario2
+    #       as the residual
+    prob_better.loc[:, name2] = ((scen1 > scen2).sum(1) + 0.5 * (scen1 == scen2).sum(1)) / n_iter * 100
+
+    # Plotting
+    fig = plt.figure(facecolor='white')
+    ax = plt.subplot(111)
+    prob_better.plot.barh(ax=ax,
+                          stacked=True,
+                          color=sns.color_palette(palette),
+                          edgecolor='k')
+
+    # Make the x-axis stretch from 100% Scenario 1 to 100% Scenario 2
+    ax.set_xlim(-100, 100)
+
+    # Vertical line at 0%
+    ax.axvline(color='k', linewidth=1)
+
+    # Get rid of negative values in axis labels, turn into positive integers
+    xticklabels = [str(abs(int(i))) for i in ax.get_xticks()]
+    ax.set_xticklabels(xticklabels)
+
+    # Label and legend
+    ax.set_ylabel('')
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2),  ncol=2, fancybox=True)
+
+    return ax, fig
+
 
 def _normalize_impacts(df, ix_categories, ix_ref_level, ref=None, donotsumbutnormalize=('err_neg', 'err_pos')):
     """ Express the score of each entity as percentage of one specific entity
@@ -424,7 +434,7 @@ def _calc_cumsum_tidy_df(df, var_name='stages'):
 
 
 def _plot_grouped_stackedbars_from_tidycumsum(cumsum_df, categories, stacked_portions, values,
-        entities_compared, orient='h', palette_def=('pastel', 'muted', 'dark')): 
+        entities_compared, orient='h', palette_def=('pastel', 'deep', 'dark')): 
     """ Plotting function behind `plot_grouped_stackedbar_comparison()`
 
       Mode 2) If the number of entities is greater than the number of defined palettes,
