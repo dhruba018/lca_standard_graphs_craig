@@ -6,7 +6,9 @@ from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
 import pdb
 
-def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max', err_pos=None, err_neg=None, palette_def=('pastel', 'deep', 'dark'), width=0.3):
+
+def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max', err_pos=None, err_neg=None,
+                             palette_def=('pastel', 'deep', 'dark'), width=0.3):
     """ Grouped stacked-bars for both comparison and contribution analysis
 
     This plot groups bars, representing the total scores of different entities
@@ -91,21 +93,20 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
 
     # Hardcoded
     edgecolor = 'k'
-    transparent = (0,0,0,0)
+    transparent = (0, 0, 0, 0)
 
     # Normalize
     if norm is not None:
         if norm == 'max':
             df = _normalize_impacts(df, ix_categories, ix_entities_compared,
-                    donotsumbutnormalize=(err_neg, err_pos))
+                                    donotsumbutnormalize=(err_neg, err_pos))
         else:
-            df = _normalize_impacts(df, ix_categories, ix_entities_compared,
-                    ref=norm, donotsumbutnormalize=(err_neg, err_pos))
+            df = _normalize_impacts(df, ix_categories, ix_entities_compared, ref=norm,
+                                    donotsumbutnormalize=(err_neg, err_pos))
 
     # Initializations
     fig = plt.figure(facecolor='white')
     ax = plt.subplot(111)
-    legend_elements = []
 
     # All compared entities, in order of appearance
     all_entities = df.index.get_level_values(ix_entities_compared).unique()
@@ -116,13 +117,12 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
     n_palettes = len(palette_def)
 
     # Define palettes
-    palettes=[]
+    palettes = []
     if n_entities_compared <= n_palettes:
         for i in range(n_palettes - n_entities_compared, n_palettes):
             palettes += [sns.color_palette(palette_def[i])]
     else:
         palettes = None
-
 
     # Loop over all entities compared
     for i, ent in enumerate(all_entities):
@@ -144,13 +144,12 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
 
         # Plot horizontal bar
         sub.plot.barh(ax=ax, stacked=True, position=i, width=width, zorder=-1,
-                color=sns.color_palette(palettes[i]), edgecolor=edgecolor, label=label)
+                      color=sns.color_palette(palettes[i]), edgecolor=edgecolor, label=label)
 
         # Plot over this bar with a transparent bar, to add the confidence interval
         sub.sum(1).plot.barh(ax=ax, position=i, width=width, color=transparent, xerr=err, label='_nolegend_')
 
-
-        if i == n_entities_compared -1 :
+        if i == n_entities_compared - 1:
 
             # Generate the legend complement explaining about shading
             legend_elements = _generate_legend(all_entities)
@@ -163,7 +162,6 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
                        bbox_transform=fig.transFigure,
                        loc="center left")
 
-
     # Remove context-dependent stuff, can be added a posteriori
     ax.xaxis.set_label_text('')
     ax.yaxis.set_label_text('')
@@ -174,7 +172,8 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
     return ax, fig
 
 
-def plot_grouped_stackedbar_wlargegroups(df, ix_categories, ix_entities_compared, norm='max', orient='h', palette_def=('pastel', 'deep', 'dark')):
+def plot_grouped_stackedbar_wlargegroups(df, ix_categories, ix_entities_compared, norm='max', orient='h',
+                                         palette_def=('pastel', 'deep', 'dark')):
     """ Grouped stacked-bars for both comparison and contribution analysis
 
     Group bars, representing the total scores of different compared entities
@@ -384,13 +383,11 @@ def _normalize_impacts(df, ix_categories, ix_ref_level, ref=None, donotsumbutnor
         grouped_levels = list({i for i in df.index.names} - {ix_categories})
         ref_imp = df[stages].sum(axis=1).reset_index(grouped_levels, drop=True).groupby(ix_categories).max()
 
-    
     # Reindex the resulting reference values, to allow for "broadcast" division
     ref_imp = ref_imp.reindex(df.index, level=ix_categories)
 
     # Divide the dataframe row-wise, for a normalized result
     return df.divide(ref_imp, axis=0) * 100
-
 
 
 def _calc_cumsum_tidy_df(df, var_name='stages'):
@@ -433,8 +430,8 @@ def _calc_cumsum_tidy_df(df, var_name='stages'):
     return df.melt(id_vars=ix_names, var_name=var_name)
 
 
-def _plot_grouped_stackedbars_from_tidycumsum(cumsum_df, categories, stacked_portions, values,
-        entities_compared, orient='h', palette_def=('pastel', 'deep', 'dark')): 
+def _plot_grouped_stackedbars_from_tidycumsum(cumsum_df, categories, stacked_portions, values, entities_compared,
+                                              orient='h', palette_def=('pastel', 'deep', 'dark')):
     """ Plotting function behind `plot_grouped_stackedbar_comparison()`
 
       Mode 2) If the number of entities is greater than the number of defined palettes,
@@ -491,13 +488,12 @@ def _plot_grouped_stackedbars_from_tidycumsum(cumsum_df, categories, stacked_por
     colors = sns.color_palette(palette_def[-1], n_colors=n_stacked_portions)
 
     # Define palettes if this function is run as "Mode 1"
-    palettes=[]
+    palettes = []
     if n_entities_compared <= n_palettes:
         for i in range(n_palettes - n_entities_compared, n_palettes):
             palettes += [sns.color_palette(palette_def[i], n_colors=n_stacked_portions)]
     else:
         palettes = None
-
 
     # Swap x and y axes, for vertical or horizontal bars, depending
     if orient == 'h':
@@ -506,7 +502,6 @@ def _plot_grouped_stackedbars_from_tidycumsum(cumsum_df, categories, stacked_por
     else:
         x = categories
         y = values
-
 
     # Loop over all stacked proportions, to plot each in order, on over the
     # other, creating the illusion of stacked bars
@@ -525,50 +520,54 @@ def _plot_grouped_stackedbars_from_tidycumsum(cumsum_df, categories, stacked_por
             color = None
             palette = [p[i] for p in palettes]
 
-        ax = sns.barplot(data=g,
-                 x=x,
-                 y=y,
-                 hue=entities_compared,
-                 color=color,
-                 palette=palette,
-                 zorder=n_stacked_portions - i,
-                 edgecolor="k", ci=None)
+        ax = sns.barplot(data=g, x=x, y=y, hue=entities_compared, color=color, palette=palette,
+                         zorder=n_stacked_portions - i, edgecolor="k", ci=None)
 
         if i == 0:
             legend_elements = _generate_legend(g[entities_compared].unique())
         try:
-            legend_elements += [Patch(facecolor=palette[-1], label=j),]
+            legend_elements += [Patch(facecolor=palette[-1], label=j), ]
         except TypeError:
-            legend_elements += [Patch(facecolor=color, label=j),]
-
+            legend_elements += [Patch(facecolor=color, label=j), ]
 
     # Remove context-dependent stuff
-    ax.legend_.remove() # remove the redundant legends
+    ax.legend_.remove()  # remove the redundant legends
     ax.xaxis.set_label_text('')
     ax.yaxis.set_label_text('')
 
-
     legend_elements.reverse()
     plt.legend(handles=legend_elements,
-              bbox_to_anchor=(1, 0.5),
-              bbox_transform=fig.transFigure,
-              # ncol=3,
-              loc="center left")
+               bbox_to_anchor=(1, 0.5),
+               bbox_transform=fig.transFigure,
+               loc="center left")
 
     return ax, fig
 
 
 def _generate_legend(entities):
-    legend_elements = []
+    """ Generate legend explaining shading in grouped_stackbar graphs, based on order and number of entities compared
 
+    Handles either two entities (light & dark), three entities (light medium and dark), or more.
+    In this last case, it generates a single entry stating the order of the gradient (lightest to darkest).
+
+    Parameters
+    ----------
+    entities : list
+        List of strings of names of the entities being compared, in the order that they are processed
+
+    Returns
+    -------
+    legend_element : matplotlib legend
+    """
+
+    legend_elements = []
 
     if len(entities) > 3:
         legend_elements += [Patch(edgecolor='black',
                                   facecolor='white',
-                                  label="Gradient: {} (lightest), {}, {} (darkest)".format(
-                                      entities[0],
-                                      ', '.join(entities[1: -1]),
-                                      entities[-1]))]
+                                  label="Gradient: {} (lightest), {}, {} (darkest)".format(entities[0],
+                                                                                           ', '.join(entities[1: -1]),
+                                                                                           entities[-1]))]
 
     else:
 
@@ -588,4 +587,3 @@ def _generate_legend(entities):
 
 # It might be pertinent to define and lighten/darken colormaps ourselves:
 # https://scipy-cookbook.readthedocs.io/items/Matplotlib_ColormapTransformations.html
-
