@@ -292,6 +292,7 @@ def plot_stochastic_comparison(scen1, scen2, name1, name2, palette='deep'):
     prob_better = pd.DataFrame(index=scen1.index, columns=[name1, name2])
 
     # Perform calculation as numpy array (50x faster)
+    scen2 = scen2.reindex_like(scen1)
     scen1 = scen1.values
     scen2 = scen2.values
 
