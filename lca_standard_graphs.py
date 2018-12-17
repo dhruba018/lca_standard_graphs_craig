@@ -128,6 +128,11 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
     edgecolor = 'k'
     transparent = (0, 0, 0, 0)
 
+    # Test that there are not too many entities compared.
+    if len(df.index.get_level_values(ix_entities_compared).unique()) > 3:
+        print("Warning. Too many entities being compared. Please use `plot_grouped_stackedbars_wlargegroups()` instead.")
+        return None
+
     # Normalize
     if norm is not None:
         if norm == 'max':
