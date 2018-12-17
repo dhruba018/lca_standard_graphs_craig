@@ -6,6 +6,39 @@ from matplotlib import pyplot as plt
 from matplotlib.patches import Patch
 import pdb
 
+def build_comparison_table(dfs, names, fillna=None, column_name='Scenarios'):
+    """ Simple function to combine dataframes in a multi-index comparison table
+
+    Parameters
+    ----------
+    dfs : list of pandas dataframes to be compared
+    names : list of names to assign to each dataframe
+        Labels to distinguish each dataframe's respective data in the compiled comparison table
+    fillna: None (default), or float
+        Value with which to replace any potential NaN instance
+    column_name : string
+        Name of multi-index level that holds the `names` values.
+
+    Returns
+    -------
+    comp: dataframe
+        A comparison dataframe
+
+    """
+
+    for i, df in enumerate(dfs):
+        # Add the name of each dataframe for disambiguation
+        df.insert(0, column_name, names[i], allow_duplicates=True)
+
+    # Concatenate
+    comp = pd.concat(dfs, sort=False)
+    comp.sort_index(inplace=True)
+    comp.set_index(column_name, append=True, inplace=True)
+
+    if fillna is not None:
+        comp.fillna(fillna, inplace=True)
+
+    return comp
 
 def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max', err_pos=None, err_neg=None,
                              palette_def=('pastel', 'deep', 'dark'), width=0.3):
