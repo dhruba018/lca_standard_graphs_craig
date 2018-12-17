@@ -205,7 +205,7 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
     return ax, fig
 
 
-def plot_grouped_stackedbar_wlargegroups(df, ix_categories, ix_entities_compared, norm='max', orient='h',
+def plot_grouped_stackedbars_wlargegroups(df, ix_categories, ix_entities_compared, norm='max', orient='h',
                                          palette_def=('pastel', 'deep', 'dark')):
     """ Grouped stacked-bars for both comparison and contribution analysis
 
