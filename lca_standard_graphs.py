@@ -41,7 +41,7 @@ def build_comparison_table(dfs, names, fillna=None, column_name='Scenarios'):
     return comp
 
 def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max', err_pos=None, err_neg=None,
-                             palette_def=('pastel', 'deep', 'dark'), width=0.3):
+                             palette_def=('pastel', 'deep', 'dark'), width=0.3, figsize=(8, 4), xaxis_label=''):
     """ Grouped stacked-bars for both comparison and contribution analysis
 
     This plot groups bars, representing the total scores of different entities
@@ -111,6 +111,12 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
     width : float
         The width of the bars.
 
+    figsize : tuple
+        The width and height of figure
+
+    xaxis_label : string
+        The label/title of the x-axis
+
     Returns
     -------
     ax, fig : matplotlib axes and figure
@@ -142,9 +148,14 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
             df = _normalize_impacts(df, ix_categories, ix_entities_compared, ref=norm,
                                     donotsumbutnormalize=(err_neg, err_pos))
 
-    # Initializations
-    fig = plt.figure(facecolor='white')
-    ax = plt.subplot(111)
+    # Initializations. Creates two subplots, the first one (ax) for the actual figure, and the second (ax2) as dummy to
+    # display the legend without this legend overlapping with the plot but still within the bounds of the figure.
+    # width_ratios is dummy ratio to make second plot very small
+    fig, (ax, ax2) = plt.subplots(1, 2, gridspec_kw = {'width_ratios':[100, 1]},
+                                  facecolor='white', figsize=figsize)
+    # make dummy axis disapear
+    ax2.get_yaxis().set_ticks([])
+    ax2.axis('off')
 
     # All compared entities, in order of appearance
     all_entities = df.index.get_level_values(ix_entities_compared).unique()
@@ -165,12 +176,6 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
     # Loop over all entities compared
     for i, ent in enumerate(all_entities):
 
-        # Only the last loop contributes to the legend
-        if i != n_entities_compared - 1:
-            label = '_nolegend_'
-        else:
-            label = None
-
         # Subset of contribution data for this loop
         sub = df.xs(ent, axis=0, level=ix_entities_compared)[all_contributions]
 
@@ -182,7 +187,7 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
 
         # Plot horizontal bar
         sub.plot.barh(ax=ax, stacked=True, position=i, width=width, zorder=-1,
-                      color=sns.color_palette(palettes[i]), edgecolor=edgecolor, label=label)
+                      color=sns.color_palette(palettes[i]), edgecolor=edgecolor, label='_nolegend_')
 
         # Plot over this bar with a transparent bar, to add the confidence interval
         sub.sum(1).plot.barh(ax=ax, position=i, width=width, color=transparent, xerr=err, label='_nolegend_')
@@ -195,17 +200,18 @@ def plot_grouped_stackedbars(df, ix_categories, ix_entities_compared, norm='max'
             # Integrate in legend and plot legend
             handles, labels = ax.get_legend_handles_labels()
             handles2 = handles[-len(all_contributions):] + legend_elements
-            plt.legend(handles=handles2,
-                       bbox_to_anchor=(1, 0.5),
-                       bbox_transform=fig.transFigure,
-                       loc="center left")
 
-    # Remove context-dependent stuff, can be added a posteriori
-    ax.xaxis.set_label_text('')
+    # Legend definition (hidden in first subplot, but displayed in second)
+    ax.get_legend().remove()
+    ax2.legend(handles=handles2, loc='center left', bbox_to_anchor=(0, 0.5))
+
+    # Axis title
+    ax.xaxis.set_label_text(xaxis_label)
     ax.yaxis.set_label_text('')
 
     # Rescale
-    ax.autoscale()
+    ax.autoscale()  # Important to not have the bars come right up to th edge of figure
+    fig.tight_layout() # Important to not have labels and legend extend beyond figure
 
     return ax, fig
 
@@ -367,6 +373,7 @@ def plot_stochastic_comparison(scen1, scen2, name1, name2, palette='deep'):
     ax.set_ylabel('')
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.2),  ncol=2, fancybox=True)
 
+    fig.tight_layout() # Important to not have labels and legend extend beyond figure
     return ax, fig
 
 
