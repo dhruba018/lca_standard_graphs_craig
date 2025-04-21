@@ -1,4 +1,5 @@
-### forked from [here](https://gitlab.com/ciraig/lca_standard_graphs) under BSD 2-Clause License
+### Disclaimer: Repository forked from [GitLab](https://gitlab.com/ciraig/lca_standard_graphs) under BSD 2-Clause License
+### Original author: [Guillaume Majeau-Bettez](https://gitlab.com/majeau-bettez)
 
 LCA Standard Graphs
 ===================
