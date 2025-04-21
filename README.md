@@ -1,3 +1,5 @@
+**forked from [here](https://gitlab.com/ciraig/lca_standard_graphs) under BSD 2-Clause License**
+
 LCA Standard Graphs
 ===================
 
